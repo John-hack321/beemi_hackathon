@@ -114,11 +114,6 @@ const GameScreen = () => {
       navigate('/');
     }
   }, [beemi, navigate]);
-    if (window.confirm('Are you sure you want to leave the game?')) {
-      // In a real app, you'd clean up and leave the room
-      navigate('/');
-    }
-  };
   
   // Get current game phase message
   const getPhaseMessage = useCallback(() => {
