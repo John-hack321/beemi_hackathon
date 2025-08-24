@@ -19,7 +19,12 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f3f4f6',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       <Routes>
         <Route path="/" element={<JoinScreen />} />
         <Route

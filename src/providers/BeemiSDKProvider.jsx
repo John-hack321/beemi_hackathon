@@ -4,6 +4,7 @@ import { useGame } from './GameProvider';
 export const BeemiContext = createContext();
 
 export const BeemiSDKProvider = ({ children }) => {
+  console.log('Initializing BeemiSDKProvider');
   const [beemi, setBeemi] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
@@ -25,20 +26,46 @@ export const BeemiSDKProvider = ({ children }) => {
 
   // Check for Beemi SDK and set up connection
   useEffect(() => {
+    console.log('Checking for Beemi SDK...');
+    
+    // Development mock - remove in production
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    if (isDevelopment) {
+      console.warn('Running in development mode with mock Beemi SDK');
+      const mockBeemi = {
+        // Add mock methods as needed
+        on: () => console.log('Mock Beemi: Event listener added'),
+        off: () => console.log('Mock Beemi: Event listener removed'),
+        // Add other required methods
+      };
+      
+      setBeemi(mockBeemi);
+      setIsConnected(true);
+      console.log('Using mock Beemi SDK for development');
+      return;
+    }
+    
     const checkForBeemi = () => {
+      console.log('Checking window.beemi:', window.beemi);
       if (window.beemi) {
+        console.log('Beemi SDK found, initializing...');
         const beemiInstance = window.beemi;
         setBeemi(beemiInstance);
         setIsConnected(true);
+        console.log('Setting up Beemi event listeners');
         setupEventListeners(beemiInstance);
         
         // Auto-join game if room code exists
         const roomCode = getCookie('roomCode');
+        console.log('Checking for room code in cookies:', roomCode);
         if (roomCode) {
+          console.log('Auto-joining room with code:', roomCode);
           joinRoom(roomCode);
         }
       } else {
-        setTimeout(checkForBeemi, 100);
+        console.warn('Beemi SDK not found, retrying in 1s...');
+        setTimeout(checkForBeemi, 1000);
       }
     };
     

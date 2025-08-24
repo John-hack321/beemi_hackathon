@@ -12,88 +12,92 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
       
-      #app-loading {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+      #root {
         display: flex;
         flex-direction: column;
+        height: 100%;
+      }
+      
+      * {
+        box-sizing: border-box;
+      }
+      
+      .loading-screen {
+        display: flex;
         justify-content: center;
         align-items: center;
+        height: 100vh;
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
         color: white;
         text-align: center;
-        z-index: 1000;
+        padding: 20px;
       }
       
-      #app-loading h1 {
-        font-size: 2.5rem;
-        margin-bottom: 1.5rem;
+      .loading-content {
+        max-width: 600px;
+        padding: 2rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
       
-      #app-loading p {
-        font-size: 1.2rem;
-        margin-bottom: 2rem;
-        color: rgba(255, 255, 255, 0.8);
+      .loading-spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top: 4px solid #fff;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1.5rem;
       }
       
-      #start-button {
-        background: #4CAF50;
-        color: white;
-        border: none;
-        padding: 1rem 2rem;
-        font-size: 1.2rem;
-        border-radius: 50px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-      }
-      
-      #start-button:hover {
-        background: #45a049;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       }
     </style>
   </head>
   <body>
-    <div id="app-loading">
-      <h1>Word Game</h1>
-      <p>Join streamers in creating the most hilarious story, one word at a time!</p>
-      <button id="start-button">Start Playing</button>
+    <div id="root">
+      <div class="loading-screen">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <h1 style="font-size: 2.5rem; margin-bottom: 1.5rem;">Loading Word Game...</h1>
+          <p>Please wait while we set up your game experience.</p>
+          <p id="loading-status" style="margin-top: 1rem; font-size: 0.9rem; color: rgba(255, 255, 255, 0.8);">Initializing...</p>
+        </div>
+      </div>
     </div>
-
-    <div id="root"></div>
     
     <script type="module" src="/src/main.jsx"></script>
     
     <script>
-      // This function will be called by the React app when it's ready
-      window.hideLoadingScreen = function() {
-        const loadingScreen = document.getElementById('app-loading');
-        if (loadingScreen) {
-          loadingScreen.style.display = 'none';
+      // Update loading status
+      const updateStatus = (message) => {
+        const statusEl = document.getElementById('loading-status');
+        if (statusEl) {
+          statusEl.textContent = message;
+          console.log('Status:', message);
         }
       };
       
-      // Hide loading screen when clicking the button
-      document.addEventListener('DOMContentLoaded', () => {
-        const startButton = document.getElementById('start-button');
-        if (startButton) {
-          startButton.addEventListener('click', () => {
-            window.hideLoadingScreen();
-            // Let the React app know to navigate to the join screen
-            window.dispatchEvent(new Event('startGame'));
-          });
+      // Initial status update
+      updateStatus('Loading application...');
+      
+      // Check if React has loaded after a delay
+      setTimeout(() => {
+        if (!window.React) {
+          updateStatus('Error: React failed to load. Please refresh the page.');
+          console.error('React not loaded after timeout');
         }
-        
-        // Auto-hide after 5 seconds if not clicked
-        setTimeout(window.hideLoadingScreen, 5000);
-      });
+      }, 5000);
     </script>
   </body>
 </html> 

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useGame } from '../providers/GameProvider';
 import { useBeemi } from '../providers/BeemiSDKProvider';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import '../styles/JoinScreen.css';
 
 const JoinScreen = () => {
+  console.log('Rendering JoinScreen component');
+  
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
@@ -13,7 +15,10 @@ const JoinScreen = () => {
   
   const { joinGame, gameState } = useGame();
   const { createRoom, joinRoom, isConnected } = useBeemi();
-  const history = useHistory();
+  const navigate = useNavigate();
+  
+  console.log('Game state:', gameState);
+  console.log('Is connected to Beemi:', isConnected);
   
   // Auto-focus the player name input on mount
   useEffect(() => {
@@ -67,7 +72,7 @@ const JoinScreen = () => {
       joinGame(trimmedName);
       
       // Navigate to lobby
-      history.push('/lobby');
+      navigate('/lobby');
       
     } catch (error) {
       console.error('Error:', error);

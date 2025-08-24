@@ -10,6 +10,8 @@ function getCookie(name) {
 export const GameContext = createContext();
 
 export const GameProvider = ({ children }) => {
+  console.log('Initializing GameProvider');
+  
   const [gameState, setGameState] = useState({
     phase: 'joining', // 'joining' | 'lobby' | 'collecting' | 'selecting' | 'completed'
     currentTurn: 1, // 1 or 2
@@ -31,13 +33,18 @@ export const GameProvider = ({ children }) => {
 
   // Generate a unique player ID if not exists
   useEffect(() => {
+    console.log('Checking player ID in GameProvider');
     if (!gameState.playerId) {
+      const newPlayerId = `player_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('Generated new player ID:', newPlayerId);
       setGameState(prev => ({
         ...prev,
-        playerId: `player_${Math.random().toString(36).substr(2, 9)}`
+        playerId: newPlayerId
       }));
     }
   }, [gameState.playerId]);
+  
+  console.log('Current game state in GameProvider:', gameState);
 
   // Game timer effect
   useEffect(() => {
