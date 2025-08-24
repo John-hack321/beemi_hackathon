@@ -251,12 +251,6 @@ export const GameProvider = ({ children }) => {
     }));
   }, []);
 
-  // Select a word for the story
-  const selectWord = useCallback((word) => {
-    if (!word) return;
-    setGameState(prev => processWordSelection(prev, word));
-  }, [processWordSelection]);
-
   // Context value
   const contextValue = {
     gameState,
