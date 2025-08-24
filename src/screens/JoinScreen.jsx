@@ -13,8 +13,8 @@ const JoinScreen = () => {
   const [error, setError] = useState('');
   const [isHost, setIsHost] = useState(false);
   
-  const { joinGame, gameState } = useGame();
-  const { createRoom, joinRoom, isConnected } = useBeemi();
+  const { joinRoom, createRoom, gameState } = useGame();
+  const { isConnected } = useBeemi();
   const navigate = useNavigate();
   
   console.log('Game state:', gameState);
@@ -53,12 +53,11 @@ const JoinScreen = () => {
     try {
       // First, join the game in our context
       console.log('Joining game as:', trimmedName);
-      joinGame(trimmedName);
       
       if (isHost) {
         // Create a new room if host
         console.log('Creating new room...');
-        const newRoomCode = createRoom();
+        const newRoomCode = await createRoom(trimmedName);
         console.log('Room created with code:', newRoomCode);
         
         if (!newRoomCode) {
@@ -70,7 +69,7 @@ const JoinScreen = () => {
       } else if (trimmedRoomCode) {
         // Join existing room if room code is provided
         console.log('Joining room:', trimmedRoomCode);
-        const joinSuccess = joinRoom(trimmedRoomCode);
+        const joinSuccess = await joinRoom(trimmedRoomCode, trimmedName);
         
         if (joinSuccess) {
           console.log('Successfully joined room, navigating to lobby...');
