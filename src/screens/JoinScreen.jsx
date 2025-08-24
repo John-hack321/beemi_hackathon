@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useGame } from '../providers/GameProvider';
 import { useBeemi } from '../providers/BeemiSDKProvider';
-import { useNavigate } from 'react-router-dom';
+import { useHistory } from 'react-router-dom';
 import '../styles/JoinScreen.css';
 
 const JoinScreen = () => {
@@ -13,7 +13,7 @@ const JoinScreen = () => {
   
   const { joinGame, gameState } = useGame();
   const { createRoom, joinRoom, isConnected } = useBeemi();
-  const navigate = useNavigate();
+  const history = useHistory();
   
   // Auto-focus the player name input on mount
   useEffect(() => {
@@ -43,46 +43,35 @@ const JoinScreen = () => {
       return;
     }
     
-    if (!isHost && !trimmedRoomCode) {
-      setError('Please enter a room code or create a new room');
-      return;
-    }
-    
-    setIsJoining(true);
-    
     try {
+      setIsJoining(true);
       let roomId = trimmedRoomCode;
       
       if (isHost) {
-        // Create a new room
-        const newRoomId = await createRoom();
-        if (!newRoomId) {
-          throw new Error('Failed to create room');
+        // Create new room
+        roomId = await createRoom();
+        if (!roomId) {
+          throw new Error('Failed to create room. Please try again.');
         }
-        roomId = newRoomId;
-        setRoomCode(roomId);
+      } else if (!roomId) {
+        throw new Error('Please enter a room code or create a new room');
       } else {
         // Join existing room
-        const success = await joinRoom(trimmedRoomCode);
+        const success = await joinRoom(roomId);
         if (!success) {
-          throw new Error('Failed to join room. Please check the room code.');
+          throw new Error('Failed to join room. Please check the code and try again.');
         }
       }
       
-      // Join the game with player name
+      // Join the game with the player's name
       joinGame(trimmedName);
       
-      // Update URL with room code
-      const newUrl = new URL(window.location);
-      newUrl.searchParams.set('room', roomId);
-      window.history.pushState({}, '', newUrl);
-      
       // Navigate to lobby
-      navigate('/lobby');
+      history.push('/lobby');
       
-    } catch (err) {
-      console.error('Error joining game:', err);
-      setError(err.message || 'An error occurred. Please try again.');
+    } catch (error) {
+      console.error('Error:', error);
+      setError(error.message || 'An error occurred. Please try again.');
     } finally {
       setIsJoining(false);
     }

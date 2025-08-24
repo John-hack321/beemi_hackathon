@@ -5,9 +5,83 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Word Game</title>
+    <style>
+      body, html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: Arial, sans-serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+      }
+      #loading-container {
+        max-width: 600px;
+        padding: 2rem;
+      }
+      h1 {
+        font-size: 2.5rem;
+        margin-bottom: 1.5rem;
+      }
+      p {
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+        color: rgba(255, 255, 255, 0.8);
+      }
+      #start-button {
+        background: #4CAF50;
+        color: white;
+        border: none;
+        padding: 1rem 2rem;
+        font-size: 1.2rem;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+      #start-button:hover {
+        background: #45a049;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      }
+      #root {
+        display: none;
+      }
+      .loading {
+        margin-top: 2rem;
+        font-style: italic;
+      }
+    </style>
   </head>
   <body>
+    <div id="loading-container">
+      <h1>Word Game</h1>
+      <p>Join streamers in creating the most hilarious story, one word at a time!</p>
+      <button id="start-button">Start Playing</button>
+      <div class="loading">Loading game...</div>
+    </div>
+
     <div id="root"></div>
+    
     <script type="module" src="/src/main.jsx"></script>
+    
+    <script>
+      document.getElementById('start-button').addEventListener('click', function() {
+        document.getElementById('loading-container').style.display = 'none';
+        document.getElementById('root').style.display = 'block';
+      });
+      
+      // Auto-hide loading screen after 3 seconds if user doesn't click
+      setTimeout(function() {
+        const loadingContainer = document.getElementById('loading-container');
+        if (loadingContainer.style.display !== 'none') {
+          loadingContainer.style.display = 'none';
+          document.getElementById('root').style.display = 'block';
+        }
+      }, 3000);
+    </script>
   </body>
 </html> 
