@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useGame } from '../providers/GameProvider';
 import { useBeemi } from '../providers/BeemiSDKProvider';
 import { useNavigate } from 'react-router-dom';
@@ -70,19 +70,27 @@ const GameScreen = () => {
   };
   
   // Handle word selection
-  const handleWordSelect = (word) => {
-    if (!isMyTurn()) return;
-    
-    if (gameState.phase === 'collecting') {
-      // Submit word suggestion
-      submitWordSuggestion(word);
-      displayNotification('Word submitted!', 'success');
-    } else if (gameState.phase === 'selecting') {
-      // Submit vote
-      submitVote(word);
-      displayNotification('Vote submitted!', 'success');
+  const handleWordSelect = useCallback((word) => {
+    if (!isMyTurn()) {
+      displayNotification("It's not your turn yet!", 'warning');
+      return;
     }
-  };
+    
+    try {
+      if (gameState.phase === 'collecting') {
+        // Submit word suggestion
+        addWordSuggestion(word);
+        displayNotification('Word submitted!', 'success');
+      } else if (gameState.phase === 'selecting') {
+        // Submit vote
+        selectWord(word);
+        displayNotification('Word selected!', 'success');
+      }
+    } catch (error) {
+      console.error('Error handling word selection:', error);
+      displayNotification(error.message || 'An error occurred', 'error');
+    }
+  }, [gameState.phase, isMyTurn, addWordSuggestion, selectWord]);
   
   // Handle chat message submission
   const handleSendMessage = (e) => {
@@ -98,89 +106,101 @@ const GameScreen = () => {
   };
   
   // Handle leaving the game
-  const handleLeaveGame = () => {
+  const handleLeaveGame = useCallback(() => {
+    if (window.confirm('Are you sure you want to leave the game?')) {
+      if (beemi) {
+        beemi.multiplayer.leaveRoom();
+      }
+      navigate('/');
+    }
+  }, [beemi, navigate]);
     if (window.confirm('Are you sure you want to leave the game?')) {
       // In a real app, you'd clean up and leave the room
       navigate('/');
     }
   };
   
+  // Get current game phase message
+  const getPhaseMessage = useCallback(() => {
+    switch (gameState.phase) {
+      case 'collecting':
+        return isMyTurn() 
+          ? 'Suggest a word to add to the story!'
+          : `Waiting for ${currentPlayer?.name || 'other player'} to suggest a word...`;
+      case 'selecting':
+        return isMyTurn()
+          ? 'Select the next word for the story!'
+          : `Waiting for ${currentPlayer?.name || 'other player'} to select a word...`;
+      case 'completed':
+        return 'Round complete!';
+      default:
+        return '';
+    }
+  }, [gameState.phase, isMyTurn, currentPlayer]);
+
   return (
     <div className="game-screen">
-      {/* Header */}
-      <header className="game-header">
-        <div className="header-left">
-          <button className="leave-button" onClick={handleLeaveGame}>
-            ← Leave Game
+      <div className="game-header">
+        <h2>Story Chain</h2>
+        <div className="game-info">
+          <div className="player-turn">
+            {isMyTurn() ? 'Your turn!' : `${currentPlayer?.name || 'Player'}'s turn`}
+          </div>
+          <div className="phase-message">{getPhaseMessage()}</div>
+          <Timer />
+          <button 
+            className="leave-button"
+            onClick={handleLeaveGame}
+          >
+            Leave Game
           </button>
         </div>
-        <div className="header-center">
-          <h1>Story Chain</h1>
-          <div className="game-phase">
-            {gameState.phase === 'collecting' && 'Suggest Words'}
-            {gameState.phase === 'selecting' && 'Vote for Words'}
-            {gameState.phase === 'completed' && 'Round Complete'}
-          </div>
-        </div>
-        <div className="header-right">
-          <Timer />
-        </div>
-      </header>
+      </div>
       
-      <div className="game-layout">
-        {/* Left sidebar - Scoreboard */}
-        <aside className="game-sidebar">
-          <ScoreBoard />
-        </aside>
+      <div className="game-content">
+        <StoryDisplay story={gameState.story} innerRef={storyEndRef} />
         
-        {/* Main game area */}
-        <main className="game-main">
-          {/* Story display */}
-          <div className="story-container">
-            <StoryDisplay innerRef={storyEndRef} />
-          </div>
-          
-          {/* Word options */}
-          <div className="word-options-container">
-            <WordOptions onSelect={handleWordSelect} />
-          </div>
-          
-          {/* Current turn indicator */}
-          <div className="turn-indicator">
-            {isMyTurn() ? (
-              <div className="your-turn">Your turn!</div>
-            ) : (
-              <div className="their-turn">
-                {currentPlayer?.name || 'Player'}'s turn
-              </div>
-            )}
-          </div>
-        </main>
+        {(gameState.phase === 'collecting' || gameState.phase === 'selecting') && (
+          <WordOptions 
+            words={gameState.phase === 'collecting' ? [] : gameState.currentWordOptions}
+            onSelect={handleWordSelect}
+            disabled={!isMyTurn()}
+            phase={gameState.phase}
+          />
+        )}
         
-        {/* Right sidebar - Chat */}
-        <aside className="chat-sidebar">
-          <h3>Chat</h3>
-          <div className="chat-messages">
-            {gameState.chatMessages.map((msg, index) => (
-              <div key={index} className={`chat-message ${msg.isSystem ? 'system' : ''}`}>
-                <span className="sender">{msg.sender}:</span> {msg.text}
-              </div>
-            ))}
-            <div ref={storyEndRef} />
-          </div>
-          <form onSubmit={handleSendMessage} className="chat-input">
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type a message..."
-              disabled={!beemi}
-            />
-            <button type="submit" disabled={!message.trim() || !beemi}>
-              Send
-            </button>
-          </form>
-        </aside>
+        <ScoreBoard 
+          players={[currentPlayer, otherPlayer].filter(Boolean)}
+          currentTurn={gameState.currentTurn}
+        />
+      </div>
+      
+      {/* Chat section */}
+      <div className="chat-container">
+        <div className="chat-messages">
+          {gameState.chatMessages?.map((msg, index) => (
+            <div key={index} className={`chat-message ${msg.isYou ? 'you' : ''}`}>
+              <span className="sender">{msg.sender}: </span>
+              <span className="message">{msg.text}</span>
+            </div>
+          ))}
+          <div ref={storyEndRef} />
+        </div>
+        <form onSubmit={handleSendMessage} className="chat-input">
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Type a message..."
+            disabled={gameState.phase === 'completed'}
+          />
+          <button 
+            type="submit" 
+            disabled={!message.trim() || gameState.phase === 'completed'}
+          >
+            Send
+          </button>
+        </form>
       </div>
       
       {/* Notification */}
@@ -190,32 +210,34 @@ const GameScreen = () => {
         </div>
       )}
       
-      {/* Game overlay for completed rounds */}
+      {/* Game over modal */}
       {gameState.phase === 'completed' && (
         <div className="game-overlay">
-          <div className="game-overlay-content">
+          <div className="game-over-modal">
             <h2>Round Complete!</h2>
-            <p>The winning word was: <strong>{gameState.winningWord}</strong></p>
-            <div className="score-summary">
-              <h3>Scores:</h3>
-              {Object.entries(gameState.scores).map(([playerId, score]) => (
-                <div key={playerId} className="score-summary-item">
-                  <span className="player-name">
-                    {gameState.players[playerId]?.name || `Player ${playerId}`}:
-                  </span>
-                  <span className="player-score">{score} points</span>
+            <div className="final-scores">
+              <h3>Final Scores:</h3>
+              {[currentPlayer, otherPlayer].filter(Boolean).map((player, index) => (
+                <div key={index} className="score-row">
+                  <span className="player-name">{player?.name || `Player ${index + 1}`}:</span>
+                  <span className="player-score">{player?.score || 0} points</span>
                 </div>
               ))}
             </div>
-            <button 
-              className="next-round-button"
-              onClick={() => {
-                // In a real app, you'd start the next round
-                console.log('Starting next round...');
-              }}
-            >
-              Next Round
-            </button>
+            <div className="game-actions">
+              <button 
+                className="primary-button"
+                onClick={() => window.location.reload()}
+              >
+                Play Again
+              </button>
+              <button 
+                className="secondary-button"
+                onClick={() => navigate('/')}
+              >
+                Back to Lobby
+              </button>
+            </div>
           </div>
         </div>
       )}
