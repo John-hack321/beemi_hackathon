@@ -1,12 +1,184 @@
+import { useState, useEffect } from 'react';
 import { useGame } from '../providers/GameProvider';
+import { useBeemi } from '../providers/BeemiSDKProvider';
+import { useNavigate } from 'react-router-dom';
+import '../styles/JoinScreen.css';
 
 const JoinScreen = () => {
-  const { joinGame } = useGame();
+  const [playerName, setPlayerName] = useState('');
+  const [roomCode, setRoomCode] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
+  const [error, setError] = useState('');
+  const [isHost, setIsHost] = useState(false);
+  
+  const { joinGame, gameState } = useGame();
+  const { createRoom, joinRoom, isConnected } = useBeemi();
+  const navigate = useNavigate();
+  
+  // Auto-focus the player name input on mount
+  useEffect(() => {
+    const nameInput = document.getElementById('playerName');
+    if (nameInput) {
+      nameInput.focus();
+    }
+    
+    // Check if we have a room code from URL or cookie
+    const params = new URLSearchParams(window.location.search);
+    const urlRoomCode = params.get('room');
+    if (urlRoomCode) {
+      setRoomCode(urlRoomCode.toUpperCase());
+    }
+  }, []);
+  
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    
+    const trimmedName = playerName.trim();
+    const trimmedRoomCode = roomCode.trim().toUpperCase();
+    
+    if (!trimmedName) {
+      setError('Please enter your name');
+      return;
+    }
+    
+    if (!isHost && !trimmedRoomCode) {
+      setError('Please enter a room code or create a new room');
+      return;
+    }
+    
+    setIsJoining(true);
+    
+    try {
+      let roomId = trimmedRoomCode;
+      
+      if (isHost) {
+        // Create a new room
+        const newRoomId = await createRoom();
+        if (!newRoomId) {
+          throw new Error('Failed to create room');
+        }
+        roomId = newRoomId;
+        setRoomCode(roomId);
+      } else {
+        // Join existing room
+        const success = await joinRoom(trimmedRoomCode);
+        if (!success) {
+          throw new Error('Failed to join room. Please check the room code.');
+        }
+      }
+      
+      // Join the game with player name
+      joinGame(trimmedName);
+      
+      // Update URL with room code
+      const newUrl = new URL(window.location);
+      newUrl.searchParams.set('room', roomId);
+      window.history.pushState({}, '', newUrl);
+      
+      // Navigate to lobby
+      navigate('/lobby');
+      
+    } catch (err) {
+      console.error('Error joining game:', err);
+      setError(err.message || 'An error occurred. Please try again.');
+    } finally {
+      setIsJoining(false);
+    }
+  };
+  
+  const toggleHostMode = () => {
+    setIsHost(!isHost);
+    setRoomCode('');
+  };
 
   return (
     <div className="join-screen">
-      <h1>Join Game</h1>
-      <button onClick={joinGame}>Join</button>
+      <div className="join-container">
+        <h1>Story Chain</h1>
+        <p className="subtitle">Create a story one word at a time with friends</p>
+        
+        {!isConnected ? (
+          <div className="connection-status">
+            <div className="spinner"></div>
+            <p>Connecting to game server...</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="join-form">
+            <div className="form-group">
+              <label htmlFor="playerName">Your Name</label>
+              <input
+                id="playerName"
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder="Enter your name"
+                maxLength={20}
+                disabled={isJoining}
+              />
+            </div>
+            
+            {!isHost && (
+              <div className="form-group">
+                <label htmlFor="roomCode">Room Code</label>
+                <input
+                  id="roomCode"
+                  type="text"
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                  placeholder="Enter room code"
+                  maxLength={6}
+                  disabled={isJoining || isHost}
+                  style={{ textTransform: 'uppercase' }}
+                />
+              </div>
+            )}
+            
+            <div className="host-toggle">
+              <label className="switch">
+                <input 
+                  type="checkbox" 
+                  checked={isHost}
+                  onChange={toggleHostMode}
+                  disabled={isJoining}
+                />
+                <span className="slider round"></span>
+              </label>
+              <span>{isHost ? 'Creating New Room' : 'Join Existing Room'}</span>
+            </div>
+            
+            {error && <div className="error-message">{error}</div>}
+            
+            <button 
+              type="submit" 
+              className="join-button"
+              disabled={isJoining}
+            >
+              {isJoining ? (
+                <>
+                  <span className="spinner small"></span>
+                  {isHost ? 'Creating Room...' : 'Joining...'}
+                </>
+              ) : isHost ? (
+                'Create Room'
+              ) : (
+                'Join Room'
+              )}
+            </button>
+          </form>
+        )}
+        
+        <div className="game-instructions">
+          <h3>How to Play</h3>
+          <ol>
+            <li>Join or create a room</li>
+            <li>Invite friends with the room code</li>
+            <li>Take turns adding words to the story</li>
+            <li>Earn points for creative contributions</li>
+          </ol>
+        </div>
+      </div>
     </div>
   );
 };
