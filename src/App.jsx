@@ -1,3 +1,4 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useContext } from 'react';
 import JoinScreen from './screens/JoinScreen';
 import LobbyScreen from './screens/LobbyScreen';
@@ -7,24 +8,36 @@ import { GameContext } from './providers/GameProvider';
 function App() {
   const { gameState } = useContext(GameContext);
 
-  const renderScreen = () => {
-    switch (gameState.phase) {
-      case 'joining':
-        return <JoinScreen />;
-      case 'lobby':
-        return <LobbyScreen />;
-      case 'collecting':
-      case 'selecting':
-      case 'completed':
-        return <GameScreen />;
-      default:
-        return <JoinScreen />;
+  // Protected route component
+  const ProtectedRoute = ({ children }) => {
+    if (gameState.phase === 'joining' && !gameState.roomCode) {
+      return <Navigate to="/" replace />;
     }
+    return children;
   };
 
   return (
-    <div>
-      {renderScreen()}
+    <div className="min-h-screen bg-gray-100">
+      <Routes>
+        <Route path="/" element={<JoinScreen />} />
+        <Route 
+          path="/lobby" 
+          element={
+            <ProtectedRoute>
+              <LobbyScreen />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/game" 
+          element={
+            <ProtectedRoute>
+              <GameScreen />
+            </ProtectedRoute>
+          } 
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 }
