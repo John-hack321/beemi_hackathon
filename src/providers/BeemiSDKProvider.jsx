@@ -41,16 +41,141 @@ export const BeemiSDKProvider = ({ children }) => {
     
     if (isDevelopment) {
       console.warn('Running in development mode with mock Beemi SDK');
+      
       const mockBeemi = {
-        // Add mock methods as needed
-        on: () => console.log('Mock Beemi: Event listener added'),
-        off: () => console.log('Mock Beemi: Event listener removed'),
-        // Add other required methods
+        // Mock streams API
+        streams: {
+          onChat: (callback) => {
+            console.log('Mock: Chat listener registered');
+            window._mockChatCallback = callback;
+            
+            // Simulate initial welcome message
+            setTimeout(() => {
+              if (window._mockChatCallback) {
+                window._mockChatCallback({
+                  text: 'Welcome to the game! Type /help for commands',
+                  user: 'System',
+                  timestamp: Date.now(),
+                  isSystem: true
+                });
+              }
+            }, 500);
+          },
+          
+          sendChat: (message) => {
+            console.log('Mock: Sending chat:', message);
+            // Echo the message back
+            setTimeout(() => {
+              if (window._mockChatCallback) {
+                window._mockChatCallback({
+                  text: message,
+                  user: 'You',
+                  timestamp: Date.now(),
+                  isYou: true
+                });
+              }
+            }, 100);
+            return Promise.resolve(true);
+          }
+        },
+        
+        // Mock multiplayer API
+        multiplayer: {
+          createRoom: async (options) => {
+            console.log('Mock: Creating room with options:', options);
+            const roomCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+            console.log('Mock: Created room:', roomCode);
+            
+            // Simulate room creation and joining
+            setTimeout(() => {
+              if (window._mockRoomJoinedCallback) {
+                window._mockRoomJoinedCallback({ id: roomCode });
+              }
+            }, 300);
+            
+            return { id: roomCode };
+          },
+          
+          joinRoom: async (roomCode) => {
+            console.log('Mock: Joining room:', roomCode);
+            
+            // Simulate successful join after a delay
+            setTimeout(() => {
+              if (window._mockRoomJoinedCallback) {
+                window._mockRoomJoinedCallback({ id: roomCode });
+              }
+            }, 300);
+            
+            return true;
+          },
+          
+          on: (event, callback) => {
+            console.log(`Mock: Adding listener for ${event}`);
+            // Store callbacks for testing
+            if (event === 'room-joined') window._mockRoomJoinedCallback = callback;
+            if (event === 'room-event') window._mockRoomEventCallback = callback;
+            if (event === 'player-joined') window._mockPlayerJoinedCallback = callback;
+            if (event === 'player-left') window._mockPlayerLeftCallback = callback;
+          },
+          
+          off: (event) => {
+            console.log(`Mock: Removing listener for ${event}`);
+            // Clean up callbacks
+            if (event === 'room-joined') window._mockRoomJoinedCallback = null;
+            if (event === 'room-event') window._mockRoomEventCallback = null;
+            if (event === 'player-joined') window._mockPlayerJoinedCallback = null;
+            if (event === 'player-left') window._mockPlayerLeftCallback = null;
+          },
+          
+          sendRoomEvent: (data) => {
+            console.log('Mock: Sending room event:', data);
+            // Simulate receiving the event back
+            setTimeout(() => {
+              if (window._mockRoomEventCallback) {
+                window._mockRoomEventCallback(data);
+              }
+            }, 10);
+            return Promise.resolve(true);
+          },
+          
+          currentRoom: null
+        }
       };
+      
+      // Add test functions to window for easy debugging
+      if (isDevelopment) {
+        window.testChatMessage = (message) => {
+          if (window._mockChatCallback) {
+            window._mockChatCallback({
+              text: message,
+              user: 'TestUser',
+              timestamp: Date.now()
+            });
+          }
+        };
+        
+        window.testPlayerJoined = (playerName) => {
+          if (window._mockPlayerJoinedCallback) {
+            window._mockPlayerJoinedCallback({
+              name: playerName || 'TestPlayer',
+              id: Math.random().toString(36).substr(2, 9)
+            });
+          }
+        };
+        
+        window.testGameStart = () => {
+          if (window._mockRoomEventCallback) {
+            window._mockRoomEventCallback({
+              type: 'gameStarting',
+              countdown: 3
+            });
+          }
+        };
+      }
       
       setBeemi(mockBeemi);
       setIsConnected(true);
-      console.log('Using mock Beemi SDK for development');
+      console.log('Using complete mock Beemi SDK for development');
       return;
     }
     
