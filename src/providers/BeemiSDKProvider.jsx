@@ -1,7 +1,15 @@
-import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef, useContext } from 'react';
 import { useGame } from './GameProvider';
 
 export const BeemiContext = createContext();
+
+export const useBeemi = () => {
+  const context = useContext(BeemiContext);
+  if (!context) {
+    throw new Error('useBeemi must be used within a BeemiSDKProvider');
+  }
+  return context;
+};
 
 export const BeemiSDKProvider = ({ children }) => {
   console.log('Initializing BeemiSDKProvider');

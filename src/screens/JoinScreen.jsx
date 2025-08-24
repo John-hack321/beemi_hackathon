@@ -48,35 +48,43 @@ const JoinScreen = () => {
       return;
     }
     
+    setIsJoining(true);
+    
     try {
-      setIsJoining(true);
-      let roomId = trimmedRoomCode;
-      
-      if (isHost) {
-        // Create new room
-        roomId = await createRoom();
-        if (!roomId) {
-          throw new Error('Failed to create room. Please try again.');
-        }
-      } else if (!roomId) {
-        throw new Error('Please enter a room code or create a new room');
-      } else {
-        // Join existing room
-        const success = await joinRoom(roomId);
-        if (!success) {
-          throw new Error('Failed to join room. Please check the code and try again.');
-        }
-      }
-      
-      // Join the game with the player's name
+      // First, join the game in our context
+      console.log('Joining game as:', trimmedName);
       joinGame(trimmedName);
       
-      // Navigate to lobby
-      navigate('/lobby');
+      if (isHost) {
+        // Create a new room if host
+        console.log('Creating new room...');
+        const newRoomCode = createRoom();
+        console.log('Room created with code:', newRoomCode);
+        
+        if (!newRoomCode) {
+          throw new Error('Failed to create room. Please try again.');
+        }
+        
+        console.log('Navigating to lobby...');
+        navigate('/lobby');
+      } else if (trimmedRoomCode) {
+        // Join existing room if room code is provided
+        console.log('Joining room:', trimmedRoomCode);
+        const joinSuccess = joinRoom(trimmedRoomCode);
+        
+        if (joinSuccess) {
+          console.log('Successfully joined room, navigating to lobby...');
+          navigate('/lobby');
+        } else {
+          throw new Error('Failed to join room. Please check the room code and try again.');
+        }
+      } else {
+        throw new Error('Please enter a room code or create a new game');
+      }
       
-    } catch (error) {
-      console.error('Error:', error);
-      setError(error.message || 'An error occurred. Please try again.');
+    } catch (err) {
+      console.error('Error in game setup:', err);
+      setError(err.message || 'An error occurred. Please try again.');
     } finally {
       setIsJoining(false);
     }

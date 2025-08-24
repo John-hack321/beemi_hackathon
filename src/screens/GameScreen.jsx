@@ -12,11 +12,16 @@ const GameScreen = () => {
   const { 
     gameState, 
     selectWord, 
-    submitWordSuggestion,
-    submitVote,
-    getCurrentPlayer,
-    isMyTurn
+    addWordSuggestion,
+    currentPlayer,
+    otherPlayer,
+    isHost
   } = useGame();
+  
+  // Helper function to check if it's the current player's turn
+  const isMyTurn = useCallback(() => {
+    return gameState.streamers[gameState.currentTurn]?.playerId === gameState.playerId;
+  }, [gameState.currentTurn, gameState.streamers, gameState.playerId]);
   
   const { beemi } = useBeemi();
   const navigate = useNavigate();
@@ -24,8 +29,6 @@ const GameScreen = () => {
   const [showNotification, setShowNotification] = useState(false);
   const [notification, setNotification] = useState({ text: '', type: '' });
   const storyEndRef = useRef(null);
-  
-  const currentPlayer = getCurrentPlayer();
   
   // Auto-scroll to bottom of story when it updates
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useGame } from '../providers/GameProvider';
 import { useBeemi } from '../providers/BeemiSDKProvider';
 import { useNavigate } from 'react-router-dom';
@@ -27,23 +27,36 @@ const LobbyScreen = () => {
   // Set up player list from game state
   useEffect(() => {
     const playerList = [];
-    if (gameState.streamers[1].connected) {
+    
+    // Add streamer 1 if connected
+    if (gameState.streamers[1]?.connected) {
       playerList.push({
         id: 1,
-        name: gameState.streamers[1].name,
+        name: gameState.streamers[1].name || 'Player 1',
         isHost: gameState.isHost,
-        isReady: playerReady && gameState.streamers[1].playerId === gameState.playerId
+        isReady: playerReady && gameState.streamers[1].playerId === gameState.playerId,
+        isYou: gameState.streamers[1].playerId === gameState.playerId
       });
     }
-    if (gameState.streamers[2].connected) {
+    
+    // Add streamer 2 if connected
+    if (gameState.streamers[2]?.connected) {
       playerList.push({
         id: 2,
-        name: gameState.streamers[2].name,
-        isHost: !gameState.isHost && gameState.streamers[2].playerId === gameState.playerId,
-        isReady: playerReady && gameState.streamers[2].playerId === gameState.playerId
+        name: gameState.streamers[2].name || 'Player 2',
+        isHost: !gameState.isHost,
+        isReady: playerReady && gameState.streamers[2].playerId === gameState.playerId,
+        isYou: gameState.streamers[2].playerId === gameState.playerId
       });
     }
+    
     setPlayers(playerList);
+    
+    // Auto-start game if we're in development and both players are ready
+    if (process.env.NODE_ENV === 'development' && playerList.length >= 2 && playerList.every(p => p.isReady)) {
+      console.log('All players ready, starting game...');
+      setTimeout(() => startGame(), 1000);
+    }
   }, [gameState, playerReady]);
 
   // Handle copy invite link
@@ -72,26 +85,47 @@ const LobbyScreen = () => {
   };
 
   // Start the game (host only)
-  const startGame = () => {
-    if (!gameState.isHost) return;
+  const startGame = useCallback(() => {
+    if (gameStarting) return;
     
-    // Notify other players the game is starting
-    if (beemi) {
-      beemi.multiplayer.sendRoomEvent({
-        type: 'gameStarting',
-        countdown: 5
-      });
+    if (gameState.isHost) {
+      console.log('Host is starting the game...');
       
-      // Start countdown
-      startCountdown(5);
+      // Notify other players the game is starting
+      if (beemi) {
+        beemi.multiplayer.sendRoomEvent({
+          type: 'gameStarting',
+          countdown: 5
+        });
+      }
+      
+      // Start countdown for everyone
+      startCountdown(beemi ? 5 : 2);
     } else {
-      // Fallback for testing without Beemi
-      startCountdown(3);
+      console.log('Only the host can start the game');
     }
-  };
+  }, [beemi, gameState.isHost, gameStarting]);
+  
+  // Handle game start event from host
+  useEffect(() => {
+    if (!beemi) return;
+    
+    const handleGameStarting = (event) => {
+      if (event.type === 'gameStarting') {
+        console.log('Game starting in', event.countdown, 'seconds');
+        startCountdown(event.countdown);
+      }
+    };
+    
+    beemi.multiplayer.on('roomEvent', handleGameStarting);
+    
+    return () => {
+      beemi.multiplayer.off('roomEvent', handleGameStarting);
+    };
+  }, [beemi]);
 
   // Start countdown to game start
-  const startCountdown = (seconds) => {
+  const startCountdown = useCallback((seconds) => {
     setGameStarting(true);
     let count = seconds;
     
@@ -101,11 +135,17 @@ const LobbyScreen = () => {
       
       if (count <= 0) {
         clearInterval(timer);
-        startWordCollection();
+        // Start the game
+        if (typeof startWordCollection === 'function') {
+          startWordCollection();
+        }
         navigate('/game');
       }
     }, 1000);
-  };
+    
+    // Cleanup function
+    return () => clearInterval(timer);
+  }, [navigate, startWordCollection]);
 
   // Handle room events
   useEffect(() => {

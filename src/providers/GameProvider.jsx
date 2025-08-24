@@ -258,12 +258,34 @@ export const GameProvider = ({ children }) => {
     }));
   }, []);
 
+  // Alias addAudienceWord to addWordSuggestion for backward compatibility
+  const addWordSuggestion = useCallback((word) => {
+    if (!word || typeof word !== 'string') return;
+    
+    const cleanWord = word.trim().toLowerCase();
+    
+    if (
+      !cleanWord || 
+      cleanWord.length > 20 || 
+      /[^a-zA-Z]/.test(cleanWord) ||
+      gameState.wordHistory.has(cleanWord)
+    ) {
+      return;
+    }
+    
+    setGameState(prev => ({
+      ...prev,
+      audienceWords: [...prev.audienceWords, cleanWord]
+    }));
+  }, [gameState.wordHistory]);
+
   // Context value
   const contextValue = {
     gameState,
     // Game actions
     startGame,
     addAudienceWord,
+    addWordSuggestion, // Alias for components expecting this name
     selectWord,
     joinGame,
     createRoom,
@@ -271,7 +293,9 @@ export const GameProvider = ({ children }) => {
     // Derived state
     isHost: gameState.streamers[1]?.isHost || false,
     currentPlayer: gameState.streamers[gameState.currentTurn],
-    otherPlayer: gameState.streamers[gameState.currentTurn === 1 ? 2 : 1]
+    otherPlayer: gameState.streamers[gameState.currentTurn === 1 ? 2 : 1],
+    // Add any other expected properties
+    submitWordSuggestion: addWordSuggestion // Another alias for compatibility
   };
 
   return (
