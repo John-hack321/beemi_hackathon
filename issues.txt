@@ -1,0 +1,8 @@
+im using next js style formating and things for example im using userrotuer in this project since i dont konw the vite specific things so do something okay , that one thing that you need to correct okay
+
+things to note : 
+
+there is a global state management on this app , that is on the game provider file i guess , so make sure you use that okay , i think its for updating the variables globaly accross all the devices , so that things like both the users sing the comments work seamlessly okay 
+just make this as good as possible okay 
+
+i have added a  things myself maybe you can look inot how it all looks like so that you do a good work 

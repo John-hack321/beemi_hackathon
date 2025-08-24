@@ -9,5 +9,19 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <div>
+      <div className = "bg-blue-500 p-10 ">
+        <h1 className = "text-lg bold text-center">Play the game</h1>
+        <button
+        className = "text-center items-center px-4 py-2"
+        onClick = {handlePlayGameClick}>Play</button>
+      </div>
+    </div>
   </body>
+  <script>
+    import { createRoot } from 'react-dom/client'
+    const handlePlayGameClick = () => {
+      router.push('/pages/join_screen')
+    }
+  </script>
 </html> 
