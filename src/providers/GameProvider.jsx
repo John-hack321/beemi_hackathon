@@ -14,17 +14,19 @@ export const GameProvider = ({ children }) => {
     phase: 'joining', // 'joining' | 'lobby' | 'collecting' | 'selecting' | 'completed'
     currentTurn: 1, // 1 or 2
     story: [],
-    wordSuggestions: new Map(), // word -> count
-    currentWordOptions: [], // top 4 words
+    audienceWords: [], // Words from audience comments
+    currentWordOptions: [], // 4 words for current selection
     scores: { streamer1: 0, streamer2: 0 },
-    timer: { remaining: 0, phase: null },
+    timer: { remaining: 5, phase: null }, // 5 seconds for word selection
     streamers: {
-      1: { name: 'Streamer 1', connected: false },
-      2: { name: 'Streamer 2', connected: false }
+      1: { name: 'Streamer 1', connected: false, isHost: false },
+      2: { name: 'Streamer 2', connected: false, isHost: false }
     },
     completedStories: [],
     playerId: null,
-    roomCode: getCookie('roomCode') || null
+    roomCode: getCookie('roomCode') || null,
+    wordHistory: new Set(), // Track used words to avoid repetition
+    storyLength: 100 // Target story length
   });
 
   // Generate a unique player ID if not exists
@@ -41,36 +43,23 @@ export const GameProvider = ({ children }) => {
   useEffect(() => {
     let timer;
     
-    if (gameState.phase === 'collecting' || gameState.phase === 'selecting') {
+    if (gameState.phase === 'selecting') {
       timer = setInterval(() => {
         setGameState(prev => {
           if (prev.timer.remaining <= 0) {
-            if (prev.phase === 'collecting') {
-              // Process collected words
-              const sortedWords = [...prev.wordSuggestions.entries()]
-                .sort((a, b) => b[1] - a[1])
-                .filter(([word]) => word && word.trim().length > 0);
-              
-              let topWords = sortedWords.slice(0, 4).map(item => item[0]);
-              
-              // Fill with seed words if needed
-              if (topWords.length < 4) {
-                const seedWords = ['and', 'the', 'a', 'is'];
-                topWords = [...topWords, ...seedWords.slice(0, 4 - topWords.length)];
-              }
-              
-              return { 
-                ...prev, 
-                phase: 'selecting', 
-                currentWordOptions: topWords, 
-                timer: { remaining: 10, phase: 'selecting' },
-                // Reset suggestions for the next round
-                wordSuggestions: new Map()
-              };
-            } else if (prev.phase === 'selecting') {
-              // Auto-select a word if time runs out
+            // Auto-select a word if time runs out
+            if (prev.currentWordOptions.length > 0) {
               const randomWord = prev.currentWordOptions[Math.floor(Math.random() * prev.currentWordOptions.length)];
               return processWordSelection(prev, randomWord);
+            } else {
+              // If no words available, just move to next turn
+              return {
+                ...prev,
+                phase: 'collecting',
+                currentTurn: prev.currentTurn === 1 ? 2 : 1,
+                timer: { remaining: 0, phase: 'collecting' },
+                currentWordOptions: []
+              };
             }
           }
           
@@ -101,21 +90,19 @@ export const GameProvider = ({ children }) => {
       timestamp: new Date().toISOString()
     }];
     
-    const newScores = { ...prevState.scores };
-    const timeBonus = prevState.timer.remaining > 2 ? 2 : 0;
-    const wordScore = 10 + timeBonus;
-    newScores[`streamer${prevState.currentTurn}`] += wordScore;
+    // Add to word history to avoid repetition
+    const newWordHistory = new Set(prevState.wordHistory).add(word.toLowerCase());
     
     // Check if story is complete
-    if (newStory.length >= 15) {
+    if (newStory.length >= prevState.storyLength) {
       const newCompletedStories = [...prevState.completedStories, newStory];
       return {
         ...prevState,
         story: newStory,
-        scores: newScores,
         phase: 'completed',
         completedStories: newCompletedStories,
-        timer: { remaining: 0, phase: 'completed' }
+        timer: { remaining: 0, phase: 'completed' },
+        wordHistory: newWordHistory
       };
     }
     
@@ -123,26 +110,13 @@ export const GameProvider = ({ children }) => {
     return {
       ...prevState,
       story: newStory,
-      scores: newScores,
       phase: 'collecting',
       currentTurn: prevState.currentTurn === 1 ? 2 : 1,
-      wordSuggestions: new Map(),
       currentWordOptions: [],
-      timer: { remaining: 30, phase: 'collecting' }
+      audienceWords: [],
+      wordHistory: newWordHistory,
+      timer: { remaining: 5, phase: 'selecting' }
     };
-  }, []);
-
-  // Start the word collection phase
-  const startWordCollection = useCallback(() => {
-    setGameState(prev => ({ 
-      ...prev, 
-      phase: 'collecting', 
-      timer: { remaining: 30, phase: 'collecting' },
-      story: [],
-      wordSuggestions: new Map(),
-      currentWordOptions: [],
-      scores: { streamer1: 0, streamer2: 0 }
-    }));
   }, []);
 
   // List of profane words to filter out
@@ -151,52 +125,54 @@ export const GameProvider = ({ children }) => {
     'explicit', 'nsfw', 'vulgar', 'curse', 'swear', 'obscene'
   ]);
 
-  // Add a word suggestion from chat
-  const addWordSuggestion = useCallback((word) => {
+  // Add a word suggestion from audience chat
+  const addAudienceWord = useCallback((word) => {
     if (!word || typeof word !== 'string') return;
     
     // Clean and validate the word
     const cleanWord = word.trim().toLowerCase();
     
-    // Skip if word is empty, too long, or contains numbers/special chars
+    // Skip if word is empty, too long, contains numbers/special chars, or already used
     if (
       !cleanWord || 
       cleanWord.length > 20 || 
       /[^a-zA-Z]/.test(cleanWord) ||
-      profaneWords.has(cleanWord)
+      profaneWords.has(cleanWord) ||
+      gameState.wordHistory.has(cleanWord) ||
+      gameState.audienceWords.includes(cleanWord)
     ) {
       return;
     }
     
     setGameState(prev => {
-      // Only add words during collection phase
+      // Only add words during collecting phase
       if (prev.phase !== 'collecting') return prev;
       
-      const newSuggestions = new Map(prev.wordSuggestions);
-      const currentCount = newSuggestions.get(cleanWord) || 0;
-      newSuggestions.set(cleanWord, currentCount + 1);
+      const newAudienceWords = [...prev.audienceWords, cleanWord];
+      
+      // When we have 4 words, move to selection phase
+      if (newAudienceWords.length >= 4) {
+        return {
+          ...prev,
+          phase: 'selecting',
+          currentWordOptions: newAudienceWords.slice(0, 4),
+          audienceWords: [],
+          timer: { remaining: 5, phase: 'selecting' }
+        };
+      }
       
       return { 
-        ...prev, 
-        wordSuggestions: newSuggestions 
+        ...prev,
+        audienceWords: newAudienceWords
       };
     });
-  }, []);
+  }, [gameState.wordHistory, gameState.audienceWords, gameState.phase]);
 
   // Select a word for the story
   const selectWord = useCallback((word) => {
     if (!word) return;
-    
     setGameState(prev => processWordSelection(prev, word));
   }, [processWordSelection]);
-
-  // Switch turns between players
-  const switchTurn = useCallback(() => {
-    setGameState(prev => ({ 
-      ...prev, 
-      currentTurn: prev.currentTurn === 1 ? 2 : 1 
-    }));
-  }, []);
 
   // Join the game as a player
   const joinGame = useCallback((playerName) => {
@@ -208,14 +184,16 @@ export const GameProvider = ({ children }) => {
         newStreamers[1] = { 
           name: playerName || 'Streamer 1', 
           connected: true,
-          playerId: prev.playerId
+          playerId: prev.playerId,
+          isHost: true // First player is host
         };
         joined = true;
       } else if (!newStreamers[2].connected) {
         newStreamers[2] = { 
           name: playerName || 'Streamer 2', 
           connected: true,
-          playerId: prev.playerId
+          playerId: prev.playerId,
+          isHost: false
         };
         joined = true;
       }
@@ -259,19 +237,38 @@ export const GameProvider = ({ children }) => {
     return true;
   }, []);
 
+  // Start the game
+  const startGame = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      phase: 'collecting',
+      story: [],
+      scores: { streamer1: 0, streamer2: 0 },
+      wordHistory: new Set(),
+      audienceWords: [],
+      currentWordOptions: [],
+      timer: { remaining: 0, phase: 'collecting' }
+    }));
+  }, []);
+
+  // Select a word for the story
+  const selectWord = useCallback((word) => {
+    if (!word) return;
+    setGameState(prev => processWordSelection(prev, word));
+  }, [processWordSelection]);
+
   // Context value
   const contextValue = {
     gameState,
     // Game actions
-    startWordCollection,
-    addWordSuggestion,
+    startGame,
+    addAudienceWord,
     selectWord,
-    switchTurn,
     joinGame,
     createRoom,
     joinRoom,
     // Derived state
-    isHost: gameState.isHost,
+    isHost: gameState.streamers[1]?.isHost || false,
     currentPlayer: gameState.streamers[gameState.currentTurn],
     otherPlayer: gameState.streamers[gameState.currentTurn === 1 ? 2 : 1]
   };
